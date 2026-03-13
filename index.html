@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Hash Chain Budget — demo</title>
+<style>
+  body { font-family: system-ui; display: flex; justify-content: center; padding: 3rem 1rem; background: #f5f5f5; }
+  .card { background: #fff; border-radius: 12px; border: 1px solid #e5e5e5; padding: 2rem; width: 100%; max-width: 360px; }
+  .btn { width: 100%; padding: 12px; font-size: 15px; font-weight: 500; border-radius: 8px; border: 1px solid #000; background: #000; color: #fff; cursor: pointer; transition: background .2s; }
+  .btn:hover:not(:disabled) { background: #222; }
+  .btn:disabled { background: #999; border-color: #999; cursor: not-allowed; }
+  .btn-secondary { background: #fff; color: #333; border-color: #ddd; margin-top: 10px; font-size: 13px; padding: 9px; }
+  .btn-secondary:hover:not(:disabled) { background: #f5f5f5; }
+  .status { margin-top: 1rem; font-size: 13px; text-align: center; color: #666; }
+  .status.dead { color: #c00; }
+  .debug { margin-top: 1.5rem; font-size: 10px; font-family: monospace; color: #bbb; line-height: 1.9; word-break: break-all; border-top: 1px solid #f0f0f0; padding-top: 1rem; }
+  .debug span { color: #999; }
+</style>
+</head>
+<body>
+<div class="card">
+  <button class="btn" id="btnDownload" disabled>Download</button>
+  <button class="btn btn-secondary" id="btnInit">↺ Simulate server init (3 downloads)</button>
+  <div class="status" id="status">— init to begin —</div>
+  <div class="debug">
+    <span>current (memory only):</span><br>
+    <span id="dbgCurrent">—</span><br><br>
+    <span>steps left:</span> <span id="dbgSteps">—</span>
+  </div>
+</div>
+<script>
+const LIMIT = 3;
+let current = null, stepsLeft = 0;
+
+async function sha256(hex) {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < bytes.length; i++)
+    bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  const hash = await crypto.subtle.digest('SHA-256', bytes.buffer);
+  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function render() {
+  const dead = stepsLeft <= 0;
+  document.getElementById('btnDownload').disabled = dead || !current;
+  document.getElementById('status').textContent = !current
+    ? '— init to begin —'
+    : dead
+      ? 'Chain exhausted — reload gets new ticket from server'
+      : stepsLeft + ' interaction' + (stepsLeft === 1 ? '' : 's') + ' left in chain';
+  document.getElementById('status').className = 'status' + (dead && current ? ' dead' : '');
+  document.getElementById('dbgCurrent').textContent = current ? current.slice(0, 32) + '…' : '—';
+  document.getElementById('dbgSteps').textContent = current ? stepsLeft : '—';
+}
+
+document.getElementById('btnInit').addEventListener('click', async () => {
+  const raw = crypto.getRandomValues(new Uint8Array(32));
+  current = Array.from(raw).map(b => b.toString(16).padStart(2, '0')).join('');
+  stepsLeft = LIMIT;
+  render();
+});
+
+document.getElementById('btnDownload').addEventListener('click', async () => {
+  if (!current || stepsLeft <= 0) return;
+  current = await sha256(current);
+  stepsLeft--;
+  render();
+});
+
+render();
+</script>
+</body>
+</html>
